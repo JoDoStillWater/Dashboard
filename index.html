@@ -222,6 +222,10 @@
             position: relative;
         }
 
+        .slot-cell.maybe {
+            background: rgba(234, 179, 8, 0.88);
+        }
+
         .slot-cell.off {
             background: rgba(239, 68, 68, 0.88);
         }
@@ -405,6 +409,7 @@
 
             <div class="legend">
                 <span><i class="dot" style="background: var(--accent-green);"></i> Світло є</span>
+                <span><i class="dot" style="background: var(--accent-yellow);"></i> Можливо</span>
                 <span><i class="dot" style="background: var(--accent-red);"></i> Відключення</span>
                 <span><i class="dot" style="background: transparent; border: 2px solid #fff;"></i> Поточний слот</span>
             </div>
@@ -428,9 +433,7 @@
             weatherUrl: 'https://api.open-meteo.com/v1/forecast?latitude=49.5535&longitude=25.5948&current=temperature_2m,weather_code&timezone=Europe%2FKyiv',
             alertRawUrl: `${WORKER_BASE}/alert`,
             gpvApiUrl: `${WORKER_BASE}/gpv`,
-            gpvFallbackUrls: [
-                // Додайте сюди резервні JSON-URL або шлях до JSON-файлу, якщо з'явиться інше джерело
-            ],
+            gpvFallbackUrls: [],
             proxies: [],
             weatherIntervalMs: 15 * 60 * 1000,
             oneMinuteMs: 60 * 1000
@@ -662,7 +665,7 @@
             try {
                 iframe.contentWindow?.location?.reload();
             } catch (_) {
-                // Кросс-доменний iframe — залишаємо поточний стан без смикання
+                // Кросс-доменний iframe
             }
         }
 
@@ -701,6 +704,17 @@
             return null;
         }
 
+        function classifySlotValue(val) {
+            const strVal = String(val ?? '0').trim();
+            if (strVal === '1' || val === 1 || val === true) {
+                return { state: 'off', label: 'Відключення' };
+            }
+            if (strVal === '10' || val === 10) {
+                return { state: 'maybe', label: 'Можливе відключення' };
+            }
+            return { state: 'on', label: 'Світло є' };
+        }
+
         function renderGpvTimeline() {
             const cellsContainer = document.getElementById('timeline-cells');
             const labelsContainer = document.getElementById('timeline-labels');
@@ -728,15 +742,17 @@
                     cell.className = 'slot-cell';
 
                     const val = timesObj ? timesObj[key] : '0';
-                    const isOff = val === '1' || val === 1 || val === true;
-                    if (isOff) {
+                    const info = classifySlotValue(val);
+                    if (info.state === 'off') {
                         cell.classList.add('off');
+                    } else if (info.state === 'maybe') {
+                        cell.classList.add('maybe');
                     }
                     if (slotIdx === currentSlot) {
                         cell.classList.add('current');
                     }
 
-                    cell.title = `${key} — ${isOff ? 'Відключення' : 'Світло є'}`;
+                    cell.title = `${key} — ${info.label}`;
                     cellsContainer.appendChild(cell);
                     slotIdx++;
                 }
@@ -754,7 +770,7 @@
                     const json = await fetchJsonWithFallback(url);
                     const member = extractGpvMember(json);
                     if (!member) {
-                        throw new Error('Unexpected GPV JSON structure');
+                        throw new Error('Empty or unexpected GPV JSON structure');
                     }
 
                     gpvRecord = member;
@@ -773,9 +789,9 @@
             if (cached && cached.dataJson) {
                 gpvRecord = cached;
             }
-            statusEl.textContent = '● HTML / CACHE';
+            statusEl.textContent = '● CACHE / FALLBACK';
             statusEl.style.color = 'var(--accent-yellow)';
-            lastSyncEl.textContent = `Останнє оновлення: ${nowStr} (API повернув HTML замість JSON)`;
+            lastSyncEl.textContent = `Останнє оновлення: ${nowStr} (використано кеш або запасне джерело)`;
             renderGpvTimeline();
         }
 
