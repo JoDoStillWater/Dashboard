@@ -388,6 +388,7 @@
             <div class="outage-controls">
                 <label for="queue-select" style="font-size: 0.9rem;">Черга:</label>
                 <select id="queue-select" onchange="onQueueChange()">
+                    <option value="5.2" selected>5.2</option>
                     <option value="1.1">1.1</option>
                     <option value="1.2">1.2</option>
                     <option value="2.1">2.1</option>
@@ -397,7 +398,6 @@
                     <option value="4.1">4.1</option>
                     <option value="4.2">4.2</option>
                     <option value="5.1">5.1</option>
-                    <option value="5.2">5.2</option>
                     <option value="6.1">6.1</option>
                     <option value="6.2">6.2</option>
                 </select>
@@ -421,13 +421,14 @@
 
             <div class="meta-footer">
                 <span id="gpv-last-sync">Останнє оновлення: —</span>
-                <span>Крок шкали: 30 хв · Авто 1 хв</span>
+                <span>Черга 5.2 · Крок 30 хв · Авто 1 хв</span>
             </div>
         </div>
     </div>
 
     <script>
         const WORKER_BASE = 'https://ternopil-proxy.serhiomessi.workers.dev';
+        const FIXED_QUEUE = '5.2';
 
         const CONFIG = {
             weatherUrl: 'https://api.open-meteo.com/v1/forecast?latitude=49.5535&longitude=25.5948&current=temperature_2m,weather_code&timezone=Europe%2FKyiv',
@@ -675,11 +676,13 @@
             refreshMapSoftly();
         }, CONFIG.oneMinuteMs);
 
-        // 4. Графік відключень світла (TOE API) — оновлення щохвилини
+        // 4. Графік відключень світла (TOE API, черга 5.2) — оновлення щохвилини
         let gpvRecord = null;
-        let selectedQueue = localStorage.getItem('selectedQueue') || '5.2';
+        let selectedQueue = FIXED_QUEUE;
         const queueSelectEl = document.getElementById('queue-select');
-        queueSelectEl.value = selectedQueue;
+        if (queueSelectEl) {
+            queueSelectEl.value = FIXED_QUEUE;
+        }
 
         function formatGraphDate(isoDate) {
             if (!isoDate) return 'Дата графіка: —';
@@ -731,7 +734,10 @@
 
             dateLabel.textContent = formatGraphDate(gpvRecord?.dateGraph);
 
-            const timesObj = gpvRecord?.dataJson?.[selectedQueue]?.times || null;
+            const timesObj =
+                gpvRecord?.dataJson?.[selectedQueue]?.times ||
+                gpvRecord?.dataJson?.[FIXED_QUEUE]?.times ||
+                null;
             const currentSlot = getCurrentSlotIndex();
             let slotIdx = 0;
 
@@ -796,8 +802,7 @@
         }
 
         function onQueueChange() {
-            selectedQueue = queueSelectEl.value;
-            localStorage.setItem('selectedQueue', selectedQueue);
+            selectedQueue = queueSelectEl?.value || FIXED_QUEUE;
             renderGpvTimeline();
         }
 
