@@ -471,7 +471,7 @@
                     return await directRes.json();
                 }
             } catch (_) {
-                // Спробуємо через проксі
+                // Спробуємо через проксі, якщо задані
             }
 
             for (const makeProxy of CONFIG.proxies) {
@@ -531,33 +531,57 @@
         setInterval(fetchWeather, CONFIG.weatherIntervalMs);
 
         // 3. Статус тривоги по Тернопільському району (щохвилини)
-        function extractTernopilAlertState(payload) {
+        function parseAlertRawObject(payload) {
             if (!payload || typeof payload !== 'object') return null;
-            const states = payload.states || payload;
 
-            for (const key of ['Тернопільський район', 'Тернопільська область']) {
-                const entry = states[key];
+            if (typeof payload.raw === 'string') {
+                try {
+                    return JSON.parse(payload.raw);
+                } catch (_) {
+                    return null;
+                }
+            }
+
+            if (payload.raw && typeof payload.raw === 'object') {
+                return payload.raw;
+            }
+
+            return payload.states || payload;
+        }
+
+        function extractTernopilAlertState(payload) {
+            const map = parseAlertRawObject(payload);
+            if (!map || typeof map !== 'object') return null;
+
+            const candidateKeys = [
+                'Тернопільський район',
+                'Тернопільська область'
+            ];
+
+            for (const key of candidateKeys) {
+                const entry = map[key];
                 if (typeof entry === 'boolean') return entry;
                 if (entry && typeof entry === 'object') {
+                    if (typeof entry.enabled === 'boolean') return entry.enabled;
                     if (typeof entry.alert === 'boolean') return entry.alert;
                     if (typeof entry.active === 'boolean') return entry.active;
                 }
             }
 
-            const list = Array.isArray(payload) ? payload : (Array.isArray(payload.districts) ? payload.districts : null);
+            const list = Array.isArray(map) ? map : (Array.isArray(map.districts) ? map.districts : null);
             if (list) {
                 const districtMatch = list.find(item =>
                     String(item?.name || item?.name_uk || '').toLowerCase().includes('тернопільський район')
                 );
                 if (districtMatch) {
-                    return Boolean(districtMatch.alert ?? districtMatch.active ?? districtMatch.is_alert);
+                    return Boolean(districtMatch.enabled ?? districtMatch.alert ?? districtMatch.active ?? districtMatch.is_alert);
                 }
 
                 const regionMatch = list.find(item =>
                     String(item?.name || item?.name_uk || '').toLowerCase().includes('тернопільська область')
                 );
                 if (regionMatch) {
-                    return Boolean(regionMatch.alert ?? regionMatch.active ?? regionMatch.is_alert);
+                    return Boolean(regionMatch.enabled ?? regionMatch.alert ?? regionMatch.active ?? regionMatch.is_alert);
                 }
             }
 
