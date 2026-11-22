@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0f172a">
+    <title>Smart Dashboard — Тернопіль</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.78);
+            --card-border: rgba(255, 255, 255, 0.12);
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-blue: #3b82f6;
+            --accent-yellow: #eab308;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 14px;
+            overflow: hidden;
+        }
+
+        #app-container {
+            display: grid;
+            grid-template-columns: 1.1fr 1fr;
+            grid-template-rows: auto 1fr;
+            gap: 14px;
+            height: calc(100vh - 28px);
+            transition: transform 0.6s ease;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            backdrop-filter: blur(12px);
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+            min-height: 0;
+        }
+
+        .card-header {
+            font-size: 0.85rem;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-card {
+            grid-column: span 2;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 24px;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .time {
+            font-size: clamp(2.2rem, 4vw, 3.2rem);
+            font-weight: 700;
+            letter-spacing: 2px;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .date {
+            font-size: 0.95rem;
+            color: var(--text-sub);
+            margin-top: 6px;
+            text-transform: capitalize;
+        }
+
+        .district-alert-box {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 10px 18px;
+            border-radius: 12px;
+            background: rgba(15, 23, 42, 0.65);
+            border: 1px solid var(--card-border);
+        }
+
+        .alert-status-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background-color: var(--accent-green);
+            box-shadow: 0 0 12px var(--accent-green);
+            flex-shrink: 0;
+        }
+
+        .alert-status-dot.active {
+            background-color: var(--accent-red);
+            box-shadow: 0 0 14px var(--accent-red);
+            animation: pulse 1.4s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.15); opacity: 0.55; }
+        }
+
+        .weather-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .weather-temp {
+            font-size: 2rem;
+            font-weight: 700;
+            line-height: 1.1;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .map-container {
+            width: 100%;
+            height: 100%;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #0b1120;
+            flex: 1;
+            min-height: 0;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .outage-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 12px;
+            align-items: center;
+        }
+
+        select {
+            background: #1e293b;
+            color: var(--text-main);
+            border: 1px solid var(--card-border);
+            padding: 7px 12px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        .legend {
+            display: flex;
+            gap: 14px;
+            font-size: 0.8rem;
+            color: var(--text-sub);
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .legend span {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            display: inline-block;
+        }
+
+        .timeline-wrapper {
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .timeline {
+            display: grid;
+            grid-template-columns: repeat(48, 1fr);
+            gap: 2px;
+            background: #0b1120;
+            padding: 8px;
+            border-radius: 10px;
+        }
+
+        .slot-cell {
+            height: 44px;
+            border-radius: 3px;
+            background: rgba(34, 197, 94, 0.82);
+            transition: transform 0.2s ease, background 0.2s ease;
+            position: relative;
+        }
+
+        .slot-cell.off {
+            background: rgba(239, 68, 68, 0.88);
+        }
+
+        .slot-cell.current {
+            outline: 2px solid #ffffff;
+            z-index: 2;
+        }
+
+        .hour-labels {
+            display: grid;
+            grid-template-columns: repeat(24, 1fr);
+            gap: 2px;
+            text-align: center;
+            font-size: 0.68rem;
+            color: var(--text-sub);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .meta-footer {
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            color: var(--text-sub);
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .status-badge {
+            font-size: 0.72rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.06);
+            white-space: nowrap;
+        }
+
+        .fs-btn {
+            position: fixed;
+            bottom: 14px;
+            right: 14px;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            z-index: 999;
+            font-size: 0.8rem;
+        }
+
+        @media (max-width: 900px) {
+            body {
+                overflow: auto;
+            }
+
+            #app-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 360px auto;
+                height: auto;
+            }
+
+            .header-card {
+                grid-column: span 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="fs-btn" onclick="toggleFullScreen()">⛶ Повний екран</button>
+
+    <div id="app-container">
+        <!-- Верхня панель: Годинник, Статус тривоги (Тернопільський р-н), Погода -->
+        <div class="card header-card">
+            <div>
+                <div class="time" id="clock">00:00:00</div>
+                <div class="date" id="date">Завантаження дати...</div>
+            </div>
+
+            <div class="district-alert-box">
+                <div id="alert-dot" class="alert-status-dot"></div>
+                <div>
+                    <div style="font-size: 0.78rem; color: var(--text-sub);">Тернопільський район</div>
+                    <div id="alert-text" style="font-weight: 700; font-size: 1rem;">Перевірка статусу...</div>
+                    <div id="alert-updated" style="font-size: 0.72rem; color: var(--text-sub);">Оновлення щохвилини</div>
+                </div>
+            </div>
+
+            <div class="weather-info">
+                <span id="weather-icon" style="font-size: 2.2rem;">🌤️</span>
+                <div>
+                    <div class="weather-temp" id="weather-temp">-- °C</div>
+                    <div style="font-size: 0.8rem; color: var(--text-sub);" id="weather-meta">Тернопіль · 15 хв</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Лівий блок: Карта повітряних тривог -->
+        <div class="card">
+            <div class="card-header">
+                <span>Карта тривог України</span>
+                <span style="font-size: 0.72rem; color: var(--accent-green);">● АВТО 1 ХВ</span>
+            </div>
+            <div class="map-container">
+                <iframe id="alert-map-iframe" src="https://alerts.in.ua/" loading="lazy"></iframe>
+            </div>
+        </div>
+
+        <!-- Правий блок: Графік відключень світла (TOE API) -->
+        <div class="card">
+            <div class="card-header">
+                <span>Графік відключень (Тернопільобленерго)</span>
+                <span id="gpv-sync-status" class="status-badge">Оновлення...</span>
+            </div>
+
+            <div class="outage-controls">
+                <label for="queue-select" style="font-size: 0.9rem;">Черга:</label>
+                <select id="queue-select" onchange="onQueueChange()">
+                    <option value="1.1">1.1</option>
+                    <option value="1.2">1.2</option>
+                    <option value="2.1">2.1</option>
+                    <option value="2.2">2.2</option>
+                    <option value="3.1">3.1</option>
+                    <option value="3.2">3.2</option>
+                    <option value="4.1">4.1</option>
+                    <option value="4.2">4.2</option>
+                    <option value="5.1">5.1</option>
+                    <option value="5.2">5.2</option>
+                    <option value="6.1">6.1</option>
+                    <option value="6.2">6.2</option>
+                </select>
+                <span id="gpv-date-label" style="font-size: 0.8rem; color: var(--text-sub); margin-left: auto;">
+                    Дата графіка: —
+                </span>
+            </div>
+
+            <div class="legend">
+                <span><i class="dot" style="background: var(--accent-green);"></i> Світло є</span>
+                <span><i class="dot" style="background: var(--accent-red);"></i> Відключення</span>
+                <span><i class="dot" style="background: transparent; border: 2px solid #fff;"></i> Поточний слот</span>
+            </div>
+
+            <div class="timeline-wrapper">
+                <div class="timeline" id="timeline-cells"></div>
+                <div class="hour-labels" id="timeline-labels"></div>
+            </div>
+
+            <div class="meta-footer">
+                <span id="gpv-last-sync">Останнє оновлення: —</span>
+                <span>Крок шкали: 30 хв · Авто 1 хв</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CONFIG = {
+            weatherUrl: 'https://api.open-meteo.com/v1/forecast?latitude=49.5535&longitude=25.5948&current=temperature_2m,weather_code&timezone=Europe%2FKyiv',
+            alertPrimaryUrl: 'https://ubilling.net.ua/aerialalerts/?raw=true',
+            alertFallbackUrl: 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://ubilling.net.ua/aerialalerts/?raw=true'),
+            gpvApiUrl: 'https://toe.com.ua/api/actual_gpv_graphs/custom',
+            corsProxies: [
+                url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+                url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+            ],
+            weatherIntervalMs: 15 * 60 * 1000,
+            oneMinuteMs: 60 * 1000
+        };
+
+        // 1. Годинник та дата (щосекунди)
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').textContent = now.toLocaleTimeString('uk-UA', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+            document.getElementById('date').textContent = now.toLocaleDateString('uk-UA', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            });
+        }
+        updateClock();
+        setInterval(updateClock, 1000);
+
+        // 2. Погода для Тернополя (кожні 15 хв)
+        function getWeatherIcon(code) {
+            if (code === 0) return '☀️';
+            if (code >= 1 && code <= 3) return '⛅';
+            if (code === 45 || code === 48) return '🌫️';
+            if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return '🌧️';
+            if ((code >= 71 && code <= 77) || code === 85 || code === 86) return '❄️';
+            if (code >= 95) return '⚡';
+            return '🌤️';
+        }
+
+        async function fetchWeather() {
+            try {
+                const res = await fetch(CONFIG.weatherUrl, { cache: 'no-store' });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                const temp = Math.round(data.current.temperature_2m);
+                const code = data.current.weather_code;
+
+                document.getElementById('weather-temp').textContent = `${temp > 0 ? `+${temp}` : temp} °C`;
+                document.getElementById('weather-icon').textContent = getWeatherIcon(code);
+                localStorage.setItem('cached_weather', JSON.stringify({ temp, code, ts: Date.now() }));
+            } catch (err) {
+                console.warn('Weather fetch error:', err);
+                const cached = JSON.parse(localStorage.getItem('cached_weather') || 'null');
+                if (cached) {
+                    document.getElementById('weather-temp').textContent = `${cached.temp > 0 ? `+${cached.temp}` : cached.temp} °C`;
+                    document.getElementById('weather-icon').textContent = getWeatherIcon(cached.code);
+                }
+            }
+        }
+        fetchWeather();
+        setInterval(fetchWeather, CONFIG.weatherIntervalMs);
+
+        // 3. Статус тривоги по Тернопільському району + оновлення карти (щохвилини)
+        function extractTernopilAlertState(payload) {
+            if (!payload || typeof payload !== 'object') return null;
+
+            const states = payload.states || payload;
+            const candidateKeys = [
+                'Тернопільський район',
+                'Тернопільська область'
+            ];
+
+            for (const key of candidateKeys) {
+                const entry = states[key];
+                if (entry === true) return true;
+                if (entry && typeof entry === 'object') {
+                    if (typeof entry.alert === 'boolean') return entry.alert;
+                    if (typeof entry.active === 'boolean') return entry.active;
+                }
+            }
+
+            // Якщо у відповіді є масив регіонів/районів
+            const list = Array.isArray(payload) ? payload : (Array.isArray(payload.districts) ? payload.districts : null);
+            if (list) {
+                const districtMatch = list.find(item =>
+                    String(item?.name || item?.name_uk || '').toLowerCase().includes('тернопільський район')
+                );
+                if (districtMatch) {
+                    return Boolean(districtMatch.alert ?? districtMatch.active ?? districtMatch.is_alert);
+                }
+
+                const regionMatch = list.find(item =>
+                    String(item?.name || item?.name_uk || '').toLowerCase().includes('тернопільська область')
+                );
+                if (regionMatch) {
+                    return Boolean(regionMatch.alert ?? regionMatch.active ?? regionMatch.is_alert);
+                }
+            }
+
+            return null;
+        }
+
+        function renderAlertBadge(isAlert, sourceNote = '') {
+            const dot = document.getElementById('alert-dot');
+            const text = document.getElementById('alert-text');
+            const updated = document.getElementById('alert-updated');
+            const nowStr = new Date().toLocaleTimeString('uk-UA', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+
+            if (isAlert === true) {
+                dot.classList.add('active');
+                text.textContent = 'ТРИВОГА В РАЙОНІ!';
+                text.style.color = '#fca5a5';
+            } else if (isAlert === false) {
+                dot.classList.remove('active');
+                text.textContent = 'Тривоги немає';
+                text.style.color = '#86efac';
+            } else {
+                dot.classList.remove('active');
+                text.textContent = 'Статус уточнюється';
+                text.style.color = 'var(--text-sub)';
+            }
+
+            updated.textContent = `Оновлено: ${nowStr}${sourceNote ? ` · ${sourceNote}` : ''}`;
+        }
+
+        async function checkDistrictAlert() {
+            let isAlert = null;
+            let sourceNote = '';
+
+            try {
+                const res = await fetch(CONFIG.alertPrimaryUrl, { cache: 'no-store' });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                isAlert = extractTernopilAlertState(data);
+                if (isAlert !== null) {
+                    localStorage.setItem('cached_alert_state', JSON.stringify({ isAlert, ts: Date.now() }));
+                }
+            } catch (primaryErr) {
+                try {
+                    const fallbackRes = await fetch(CONFIG.alertFallbackUrl, { cache: 'no-store' });
+                    if (!fallbackRes.ok) throw new Error(`HTTP ${fallbackRes.status}`);
+                    const fallbackData = await fallbackRes.json();
+                    isAlert = extractTernopilAlertState(fallbackData);
+                    sourceNote = 'резерв';
+                    if (isAlert !== null) {
+                        localStorage.setItem('cached_alert_state', JSON.stringify({ isAlert, ts: Date.now() }));
+                    }
+                } catch (fallbackErr) {
+                    const cached = JSON.parse(localStorage.getItem('cached_alert_state') || 'null');
+                    if (cached) {
+                        isAlert = cached.isAlert;
+                        sourceNote = 'кеш';
+                    }
+                }
+            }
+
+            renderAlertBadge(isAlert, sourceNote);
+
+            // Оновлення iframe карти раз на хвилину
+            const iframe = document.getElementById('alert-map-iframe');
+            iframe.src = 'https://alerts.in.ua/';
+        }
+        checkDistrictAlert();
+        setInterval(checkDistrictAlert, CONFIG.oneMinuteMs);
+
+        // 4. Графік відключень світла (TOE API) — оновлення щохвилини
+        let gpvRecord = null;
+        let selectedQueue = localStorage.getItem('selectedQueue') || '5.2';
+        const queueSelectEl = document.getElementById('queue-select');
+        queueSelectEl.value = selectedQueue;
+
+        async function fetchViaProxies(targetUrl) {
+            for (const makeProxy of CONFIG.corsProxies) {
+                try {
+                    const res = await fetch(makeProxy(targetUrl), { cache: 'no-store' });
+                    if (!res.ok) continue;
+                    const text = await res.text();
+                    return JSON.parse(text);
+                } catch (_) {
+                    // Пробуємо наступний проксі
+                }
+            }
+            throw new Error('All proxies failed');
+        }
+
+        function formatGraphDate(isoDate) {
+            if (!isoDate) return 'Дата графіка: —';
+            const parsed = new Date(isoDate);
+            if (Number.isNaN(parsed.getTime())) return `Дата графіка: ${isoDate}`;
+            return `Дата графіка: ${parsed.toLocaleDateString('uk-UA')}`;
+        }
+
+        function getCurrentSlotIndex() {
+            const now = new Date();
+            return now.getHours() * 2 + (now.getMinutes() >= 30 ? 1 : 0);
+        }
+
+        function renderGpvTimeline() {
+            const cellsContainer = document.getElementById('timeline-cells');
+            const labelsContainer = document.getElementById('timeline-labels');
+            const dateLabel = document.getElementById('gpv-date-label');
+
+            cellsContainer.innerHTML = '';
+            labelsContainer.innerHTML = '';
+
+            for (let h = 0; h < 24; h++) {
+                const label = document.createElement('div');
+                label.textContent = String(h).padStart(2, '0');
+                labelsContainer.appendChild(label);
+            }
+
+            dateLabel.textContent = formatGraphDate(gpvRecord?.dateGraph);
+
+            const timesObj = gpvRecord?.dataJson?.[selectedQueue]?.times || null;
+            const currentSlot = getCurrentSlotIndex();
+            let slotIdx = 0;
+
+            for (let h = 0; h < 24; h++) {
+                for (const m of ['00', '30']) {
+                    const key = `${String(h).padStart(2, '0')}:${m}`;
+                    const cell = document.createElement('div');
+                    cell.className = 'slot-cell';
+
+                    const val = timesObj ? timesObj[key] : '0';
+                    const isOff = val === '1' || val === 1 || val === true;
+                    if (isOff) {
+                        cell.classList.add('off');
+                    }
+                    if (slotIdx === currentSlot) {
+                        cell.classList.add('current');
+                    }
+
+                    cell.title = `${key} — ${isOff ? 'Відключення' : 'Світло є'}`;
+                    cellsContainer.appendChild(cell);
+                    slotIdx++;
+                }
+            }
+        }
+
+        async function fetchGpvSchedule() {
+            const statusEl = document.getElementById('gpv-sync-status');
+            const lastSyncEl = document.getElementById('gpv-last-sync');
+            const nowStr = new Date().toLocaleTimeString('uk-UA', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+
+            try {
+                const json = await fetchViaProxies(CONFIG.gpvApiUrl);
+                const member = Array.isArray(json?.['hydra:member']) ? json['hydra:member'][0] : null;
+                if (!member || !member.dataJson) {
+                    throw new Error('Unexpected GPV JSON structure');
+                }
+
+                gpvRecord = member;
+                localStorage.setItem('cached_gpv_record', JSON.stringify(member));
+                statusEl.textContent = '● AUTO SYNC';
+                statusEl.style.color = 'var(--accent-green)';
+                lastSyncEl.textContent = `Останнє оновлення: ${nowStr}`;
+                renderGpvTimeline();
+            } catch (err) {
+                console.warn('GPV sync failed:', err);
+                const cached = JSON.parse(localStorage.getItem('cached_gpv_record') || 'null');
+                if (cached) {
+                    gpvRecord = cached;
+                }
+                statusEl.textContent = '● CACHE';
+                statusEl.style.color = 'var(--accent-yellow)';
+                lastSyncEl.textContent = `Останнє оновлення: ${nowStr} (кеш)`;
+                renderGpvTimeline();
+            }
+        }
+
+        function onQueueChange() {
+            selectedQueue = queueSelectEl.value;
+            localStorage.setItem('selectedQueue', selectedQueue);
+            renderGpvTimeline();
+        }
+
+        fetchGpvSchedule();
+        setInterval(fetchGpvSchedule, CONFIG.oneMinuteMs);
+
+        // 5. Легкий зсув для захисту екрана планшета від вигорання (щохвилини)
+        let step = 0;
+        setInterval(() => {
+            step = (step + 1) % 4;
+            const x = step % 2 === 0 ? 0 : 3;
+            const y = step < 2 ? 0 : 3;
+            document.getElementById('app-container').style.transform = `translate(${x}px, ${y}px)`;
+        }, CONFIG.oneMinuteMs);
+
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen?.().catch(() => {});
+            } else {
+                document.exitFullscreen?.().catch(() => {});
+            }
+        }
+    </script>
+</body>
+</html>
