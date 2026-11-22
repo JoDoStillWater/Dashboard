@@ -37,7 +37,7 @@
 
         #app-container {
             display: grid;
-            grid-template-columns: 1.1fr 1fr;
+            grid-template-columns: 1.05fr 1.05fr;
             grid-template-rows: auto 1fr;
             gap: 14px;
             height: calc(100vh - 28px);
@@ -180,15 +180,15 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             margin-bottom: 10px;
             flex-wrap: wrap;
         }
 
         .legend {
             display: flex;
-            gap: 14px;
-            font-size: 0.82rem;
+            gap: 12px;
+            font-size: 0.78rem;
             color: var(--text-sub);
             flex-wrap: wrap;
         }
@@ -196,80 +196,113 @@
         .legend span {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
         }
 
         .dot {
-            width: 11px;
-            height: 11px;
+            width: 10px;
+            height: 10px;
             border-radius: 3px;
             display: inline-block;
         }
 
         .gpv-summary {
-            font-size: 0.82rem;
+            font-size: 0.78rem;
             color: #cbd5e1;
             background: rgba(15, 23, 42, 0.55);
             border: 1px solid rgba(255, 255, 255, 0.08);
-            padding: 5px 10px;
+            padding: 4px 10px;
             border-radius: 8px;
         }
 
-        .timeline-wrapper {
+        /* Сітка 4x6 (24 години) з розбиттям кожної години на два півгодинні слоти */
+        .hours-grid {
             flex: 1;
-            min-height: 120px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-top: 4px;
-        }
-
-        .timeline {
-            flex: 1;
-            min-height: 92px;
+            min-height: 0;
             display: grid;
-            grid-template-columns: repeat(48, minmax(0, 1fr));
-            gap: 3px;
-            background: #0b1120;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-rows: repeat(6, minmax(0, 1fr));
+            gap: 8px;
+            background: #090e1a;
             border: 1px solid rgba(255, 255, 255, 0.06);
             padding: 10px;
-            border-radius: 12px;
-            align-items: stretch;
+            border-radius: 14px;
         }
 
-        .slot-cell {
-            height: 100%;
-            min-height: 70px;
-            border-radius: 5px;
-            background: rgba(34, 197, 94, 0.84);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
-            transition: transform 0.2s ease, background 0.2s ease;
+        .hour-tile {
             position: relative;
-        }
-
-        .slot-cell.maybe {
-            background: rgba(234, 179, 8, 0.9);
-        }
-
-        .slot-cell.off {
-            background: rgba(239, 68, 68, 0.9);
-        }
-
-        .slot-cell.current {
-            outline: 2.5px solid #ffffff;
-            box-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
-            z-index: 2;
-        }
-
-        .hour-labels {
+            border-radius: 10px;
+            overflow: hidden;
             display: grid;
-            grid-template-columns: repeat(24, minmax(0, 1fr));
-            gap: 2px;
-            text-align: center;
-            font-size: 0.74rem;
-            color: var(--text-sub);
+            grid-template-columns: 1fr 1fr;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+        }
+
+        .half-slot {
+            height: 100%;
+            width: 100%;
+            background: #16a34a;
+            transition: background 0.2s ease;
+        }
+
+        .half-slot.state-on {
+            background: #16a34a;
+        }
+
+        .half-slot.state-maybe {
+            background: #eab308;
+        }
+
+        .half-slot.state-off {
+            background: #ef4444;
+        }
+
+        .half-slot.current-half {
+            box-shadow: inset 0 0 0 2.5px #ffffff;
+        }
+
+        .hour-tile.current-hour {
+            border-color: #ffffff;
+            box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.85), 0 0 14px rgba(255, 255, 255, 0.22);
+        }
+
+        .hour-tile-content {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 0 8px;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
+        }
+
+        .bolt-icon {
+            font-size: clamp(0.95rem, 1.5vw, 1.25rem);
+            color: #ffffff;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .hour-label-text {
+            font-size: clamp(0.95rem, 1.6vw, 1.3rem);
+            font-weight: 700;
+            color: #ffffff;
             font-variant-numeric: tabular-nums;
-            padding: 0 10px;
+            letter-spacing: 0.4px;
+            line-height: 1;
+        }
+
+        .half-divider {
+            position: absolute;
+            top: 4px;
+            bottom: 4px;
+            left: 50%;
+            width: 1px;
+            background: rgba(255, 255, 255, 0.22);
+            pointer-events: none;
         }
 
         .meta-footer {
@@ -354,8 +387,8 @@
                 grid-column: span 1;
             }
 
-            .slot-cell {
-                min-height: 54px;
+            .hours-grid {
+                min-height: 460px;
             }
         }
     </style>
@@ -440,18 +473,15 @@
 
             <div class="legend-row">
                 <div class="legend">
-                    <span><i class="dot" style="background: var(--accent-green);"></i> Світло є</span>
-                    <span><i class="dot" style="background: var(--accent-yellow);"></i> Можливо</span>
-                    <span><i class="dot" style="background: var(--accent-red);"></i> Відключення</span>
-                    <span><i class="dot" style="background: transparent; border: 2px solid #fff;"></i> Поточний слот</span>
+                    <span><i class="dot" style="background: #16a34a;"></i> Світло є</span>
+                    <span><i class="dot" style="background: #eab308;"></i> Можливо</span>
+                    <span><i class="dot" style="background: #ef4444;"></i> Відключення</span>
+                    <span><i class="dot" style="background: transparent; border: 1.5px solid #fff;"></i> Зараз</span>
                 </div>
                 <div id="gpv-summary" class="gpv-summary">Відключень не заплановано</div>
             </div>
 
-            <div class="timeline-wrapper">
-                <div class="timeline" id="timeline-cells"></div>
-                <div class="hour-labels" id="timeline-labels"></div>
-            </div>
+            <div class="hours-grid" id="hours-grid"></div>
 
             <div class="meta-footer">
                 <span id="gpv-last-sync">Останнє оновлення: —</span>
@@ -771,20 +801,11 @@
         }
 
         function renderGpvTimeline() {
-            const cellsContainer = document.getElementById('timeline-cells');
-            const labelsContainer = document.getElementById('timeline-labels');
+            const gridEl = document.getElementById('hours-grid');
             const dateLabel = document.getElementById('gpv-date-label');
             const summaryEl = document.getElementById('gpv-summary');
 
-            cellsContainer.innerHTML = '';
-            labelsContainer.innerHTML = '';
-
-            for (let h = 0; h < 24; h++) {
-                const label = document.createElement('div');
-                label.textContent = pad2(h);
-                labelsContainer.appendChild(label);
-            }
-
+            gridEl.innerHTML = '';
             dateLabel.textContent = formatGraphDate(gpvRecord?.dateGraph);
 
             const timesObj =
@@ -792,38 +813,58 @@
                 gpvRecord?.dataJson?.[FIXED_QUEUE]?.times ||
                 null;
             const currentSlot = getCurrentSlotIndex();
-            let slotIdx = 0;
             let offSlots = 0;
             let maybeSlots = 0;
 
             for (let h = 0; h < 24; h++) {
-                for (const m of ['00', '30']) {
-                    const key = `${pad2(h)}:${m}`;
-                    const cell = document.createElement('div');
-                    cell.className = 'slot-cell';
+                const hh = pad2(h);
+                const firstKey = `${hh}:00`;
+                const secondKey = `${hh}:30`;
 
-                    const val = timesObj ? timesObj[key] : '0';
-                    const info = classifySlotValue(val);
-                    if (info.state === 'off') {
-                        cell.classList.add('off');
-                        offSlots++;
-                    } else if (info.state === 'maybe') {
-                        cell.classList.add('maybe');
-                        maybeSlots++;
-                    }
-                    if (slotIdx === currentSlot) {
-                        cell.classList.add('current');
-                    }
+                const firstSlotIdx = h * 2;
+                const secondSlotIdx = h * 2 + 1;
 
-                    cell.title = `${key} — ${info.label}`;
-                    cellsContainer.appendChild(cell);
-                    slotIdx++;
+                const firstInfo = classifySlotValue(timesObj ? timesObj[firstKey] : '0');
+                const secondInfo = classifySlotValue(timesObj ? timesObj[secondKey] : '0');
+
+                if (firstInfo.state === 'off') offSlots++;
+                else if (firstInfo.state === 'maybe') maybeSlots++;
+
+                if (secondInfo.state === 'off') offSlots++;
+                else if (secondInfo.state === 'maybe') maybeSlots++;
+
+                const tile = document.createElement('div');
+                tile.className = 'hour-tile';
+                if (currentSlot === firstSlotIdx || currentSlot === secondSlotIdx) {
+                    tile.classList.add('current-hour');
                 }
+
+                const leftHalf = document.createElement('div');
+                leftHalf.className = `half-slot state-${firstInfo.state}`;
+                if (currentSlot === firstSlotIdx) leftHalf.classList.add('current-half');
+
+                const rightHalf = document.createElement('div');
+                rightHalf.className = `half-slot state-${secondInfo.state}`;
+                if (currentSlot === secondSlotIdx) rightHalf.classList.add('current-half');
+
+                const divider = document.createElement('div');
+                divider.className = 'half-divider';
+
+                const content = document.createElement('div');
+                content.className = 'hour-tile-content';
+                content.innerHTML = `<span class="bolt-icon">⚡</span><span class="hour-label-text">${hh}:00</span>`;
+
+                tile.title = `${firstKey} — ${firstInfo.label} | ${secondKey} — ${secondInfo.label}`;
+                tile.appendChild(leftHalf);
+                tile.appendChild(rightHalf);
+                tile.appendChild(divider);
+                tile.appendChild(content);
+                gridEl.appendChild(tile);
             }
 
             if (offSlots === 0 && maybeSlots === 0) {
                 summaryEl.textContent = gpvEmptySchedule
-                    ? 'Відключень немає (API повернуло порожній графік)'
+                    ? 'Відключень немає (порожній графік)'
                     : 'Відключень не заплановано';
                 summaryEl.style.color = '#86efac';
             } else {
