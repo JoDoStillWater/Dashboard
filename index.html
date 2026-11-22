@@ -428,6 +428,9 @@
             weatherUrl: 'https://api.open-meteo.com/v1/forecast?latitude=49.5535&longitude=25.5948&current=temperature_2m,weather_code&timezone=Europe%2FKyiv',
             alertRawUrl: `${WORKER_BASE}/alert`,
             gpvApiUrl: `${WORKER_BASE}/gpv`,
+            gpvFallbackUrls: [
+                // Додайте сюди резервні JSON-URL або шлях до JSON-файлу, якщо з'явиться інше джерело
+            ],
             proxies: [],
             weatherIntervalMs: 15 * 60 * 1000,
             oneMinuteMs: 60 * 1000
@@ -439,6 +442,27 @@
 
         function formatTimeHMS(date = new Date()) {
             return `${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+        }
+
+        function looksLikeHtml(text) {
+            const trimmed = String(text || '').trim().toLowerCase();
+            return (
+                trimmed.startsWith('<!doctype html') ||
+                trimmed.startsWith('<html') ||
+                trimmed.includes('<title>toe</title>') ||
+                trimmed.includes('<div id="root">')
+            );
+        }
+
+        function parseStrictJsonText(text) {
+            if (looksLikeHtml(text)) {
+                throw new Error('Received HTML instead of JSON');
+            }
+            const parsed = JSON.parse(text);
+            if (!parsed || typeof parsed !== 'object') {
+                throw new Error('Parsed JSON is not an object');
+            }
+            return parsed;
         }
 
         // 1. Годинник та дата (щосекунди)
@@ -468,7 +492,8 @@
             try {
                 const directRes = await fetch(directUrl, { cache: 'no-store' });
                 if (directRes.ok) {
-                    return await directRes.json();
+                    const text = await directRes.text();
+                    return parseStrictJsonText(text);
                 }
             } catch (_) {
                 // Спробуємо через проксі, якщо задані
@@ -479,13 +504,13 @@
                     const proxyRes = await fetch(makeProxy(directUrl), { cache: 'no-store' });
                     if (!proxyRes.ok) continue;
                     const text = await proxyRes.text();
-                    return JSON.parse(text);
+                    return parseStrictJsonText(text);
                 } catch (_) {
                     // Наступний проксі
                 }
             }
 
-            throw new Error(`Failed to fetch JSON: ${directUrl}`);
+            throw new Error(`Failed to fetch valid JSON: ${directUrl}`);
         }
 
         // 2. Погода для Тернополя (кожні 15 хв)
@@ -665,6 +690,17 @@
             return now.getHours() * 2 + (now.getMinutes() >= 30 ? 1 : 0);
         }
 
+        function extractGpvMember(json) {
+            if (!json || typeof json !== 'object') return null;
+            if (Array.isArray(json?.['hydra:member']) && json['hydra:member'][0]?.dataJson) {
+                return json['hydra:member'][0];
+            }
+            if (json?.dataJson && typeof json.dataJson === 'object') {
+                return json;
+            }
+            return null;
+        }
+
         function renderGpvTimeline() {
             const cellsContainer = document.getElementById('timeline-cells');
             const labelsContainer = document.getElementById('timeline-labels');
@@ -711,31 +747,36 @@
             const statusEl = document.getElementById('gpv-sync-status');
             const lastSyncEl = document.getElementById('gpv-last-sync');
             const nowStr = formatTimeHMS();
+            const candidates = [CONFIG.gpvApiUrl, ...(CONFIG.gpvFallbackUrls || [])].filter(Boolean);
 
-            try {
-                const json = await fetchJsonWithFallback(CONFIG.gpvApiUrl);
-                const member = Array.isArray(json?.['hydra:member']) ? json['hydra:member'][0] : null;
-                if (!member || !member.dataJson) {
-                    throw new Error('Unexpected GPV JSON structure');
-                }
+            for (const url of candidates) {
+                try {
+                    const json = await fetchJsonWithFallback(url);
+                    const member = extractGpvMember(json);
+                    if (!member) {
+                        throw new Error('Unexpected GPV JSON structure');
+                    }
 
-                gpvRecord = member;
-                localStorage.setItem('cached_gpv_record', JSON.stringify(member));
-                statusEl.textContent = '● AUTO SYNC';
-                statusEl.style.color = 'var(--accent-green)';
-                lastSyncEl.textContent = `Останнє оновлення: ${nowStr}`;
-                renderGpvTimeline();
-            } catch (err) {
-                console.warn('GPV sync failed:', err);
-                const cached = JSON.parse(localStorage.getItem('cached_gpv_record') || 'null');
-                if (cached) {
-                    gpvRecord = cached;
+                    gpvRecord = member;
+                    localStorage.setItem('cached_gpv_record', JSON.stringify(member));
+                    statusEl.textContent = '● AUTO SYNC';
+                    statusEl.style.color = 'var(--accent-green)';
+                    lastSyncEl.textContent = `Останнє оновлення: ${nowStr}`;
+                    renderGpvTimeline();
+                    return;
+                } catch (err) {
+                    console.warn('GPV endpoint failed:', url, err);
                 }
-                statusEl.textContent = '● CACHE / OFFLINE';
-                statusEl.style.color = 'var(--accent-yellow)';
-                lastSyncEl.textContent = `Останнє оновлення: ${nowStr} (немає зв'язку з API)`;
-                renderGpvTimeline();
             }
+
+            const cached = JSON.parse(localStorage.getItem('cached_gpv_record') || 'null');
+            if (cached && cached.dataJson) {
+                gpvRecord = cached;
+            }
+            statusEl.textContent = '● HTML / CACHE';
+            statusEl.style.color = 'var(--accent-yellow)';
+            lastSyncEl.textContent = `Останнє оновлення: ${nowStr} (API повернув HTML замість JSON)`;
+            renderGpvTimeline();
         }
 
         function onQueueChange() {
