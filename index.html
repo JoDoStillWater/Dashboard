@@ -161,7 +161,7 @@
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             align-items: center;
         }
 
@@ -176,12 +176,20 @@
             cursor: pointer;
         }
 
+        .legend-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
         .legend {
             display: flex;
             gap: 14px;
-            font-size: 0.8rem;
+            font-size: 0.82rem;
             color: var(--text-sub);
-            margin-bottom: 8px;
             flex-wrap: wrap;
         }
 
@@ -192,57 +200,76 @@
         }
 
         .dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 2px;
+            width: 11px;
+            height: 11px;
+            border-radius: 3px;
             display: inline-block;
         }
 
+        .gpv-summary {
+            font-size: 0.82rem;
+            color: #cbd5e1;
+            background: rgba(15, 23, 42, 0.55);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 5px 10px;
+            border-radius: 8px;
+        }
+
         .timeline-wrapper {
-            margin-top: auto;
+            flex: 1;
+            min-height: 120px;
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 8px;
+            margin-top: 4px;
         }
 
         .timeline {
+            flex: 1;
+            min-height: 92px;
             display: grid;
-            grid-template-columns: repeat(48, 1fr);
-            gap: 2px;
+            grid-template-columns: repeat(48, minmax(0, 1fr));
+            gap: 3px;
             background: #0b1120;
-            padding: 8px;
-            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 10px;
+            border-radius: 12px;
+            align-items: stretch;
         }
 
         .slot-cell {
-            height: 44px;
-            border-radius: 3px;
-            background: rgba(34, 197, 94, 0.82);
+            height: 100%;
+            min-height: 70px;
+            border-radius: 5px;
+            background: rgba(34, 197, 94, 0.84);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
             transition: transform 0.2s ease, background 0.2s ease;
             position: relative;
         }
 
         .slot-cell.maybe {
-            background: rgba(234, 179, 8, 0.88);
+            background: rgba(234, 179, 8, 0.9);
         }
 
         .slot-cell.off {
-            background: rgba(239, 68, 68, 0.88);
+            background: rgba(239, 68, 68, 0.9);
         }
 
         .slot-cell.current {
-            outline: 2px solid #ffffff;
+            outline: 2.5px solid #ffffff;
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
             z-index: 2;
         }
 
         .hour-labels {
             display: grid;
-            grid-template-columns: repeat(24, 1fr);
+            grid-template-columns: repeat(24, minmax(0, 1fr));
             gap: 2px;
             text-align: center;
-            font-size: 0.68rem;
+            font-size: 0.74rem;
             color: var(--text-sub);
             font-variant-numeric: tabular-nums;
+            padding: 0 10px;
         }
 
         .meta-footer {
@@ -326,6 +353,10 @@
             .header-card {
                 grid-column: span 1;
             }
+
+            .slot-cell {
+                min-height: 54px;
+            }
         }
     </style>
 </head>
@@ -407,11 +438,14 @@
                 </span>
             </div>
 
-            <div class="legend">
-                <span><i class="dot" style="background: var(--accent-green);"></i> Світло є</span>
-                <span><i class="dot" style="background: var(--accent-yellow);"></i> Можливо</span>
-                <span><i class="dot" style="background: var(--accent-red);"></i> Відключення</span>
-                <span><i class="dot" style="background: transparent; border: 2px solid #fff;"></i> Поточний слот</span>
+            <div class="legend-row">
+                <div class="legend">
+                    <span><i class="dot" style="background: var(--accent-green);"></i> Світло є</span>
+                    <span><i class="dot" style="background: var(--accent-yellow);"></i> Можливо</span>
+                    <span><i class="dot" style="background: var(--accent-red);"></i> Відключення</span>
+                    <span><i class="dot" style="background: transparent; border: 2px solid #fff;"></i> Поточний слот</span>
+                </div>
+                <div id="gpv-summary" class="gpv-summary">Відключень не заплановано</div>
             </div>
 
             <div class="timeline-wrapper">
@@ -678,6 +712,7 @@
 
         // 4. Графік відключень світла (TOE API, черга 5.2) — оновлення щохвилини
         let gpvRecord = null;
+        let gpvEmptySchedule = false;
         let selectedQueue = FIXED_QUEUE;
         const queueSelectEl = document.getElementById('queue-select');
         if (queueSelectEl) {
@@ -685,9 +720,10 @@
         }
 
         function formatGraphDate(isoDate) {
-            if (!isoDate) return 'Дата графіка: —';
-            const parsed = new Date(isoDate);
-            if (Number.isNaN(parsed.getTime())) return `Дата графіка: ${isoDate}`;
+            const parsed = isoDate ? new Date(isoDate) : new Date();
+            if (Number.isNaN(parsed.getTime())) {
+                return `Дата графіка: ${isoDate || '—'}`;
+            }
             return `Дата графіка: ${pad2(parsed.getDate())}.${pad2(parsed.getMonth() + 1)}.${parsed.getFullYear()}`;
         }
 
@@ -696,15 +732,31 @@
             return now.getHours() * 2 + (now.getMinutes() >= 30 ? 1 : 0);
         }
 
-        function extractGpvMember(json) {
-            if (!json || typeof json !== 'object') return null;
-            if (Array.isArray(json?.['hydra:member']) && json['hydra:member'][0]?.dataJson) {
-                return json['hydra:member'][0];
+        function parseGpvResponse(json) {
+            if (!json || typeof json !== 'object') {
+                return { status: 'invalid', record: null };
             }
+
+            if (Array.isArray(json?.['hydra:member'])) {
+                if (json['hydra:member'][0]?.dataJson) {
+                    return { status: 'ok', record: json['hydra:member'][0] };
+                }
+                if (json['hydra:member'].length === 0) {
+                    return {
+                        status: 'empty',
+                        record: {
+                            dateGraph: new Date().toISOString(),
+                            dataJson: {}
+                        }
+                    };
+                }
+            }
+
             if (json?.dataJson && typeof json.dataJson === 'object') {
-                return json;
+                return { status: 'ok', record: json };
             }
-            return null;
+
+            return { status: 'invalid', record: null };
         }
 
         function classifySlotValue(val) {
@@ -722,6 +774,7 @@
             const cellsContainer = document.getElementById('timeline-cells');
             const labelsContainer = document.getElementById('timeline-labels');
             const dateLabel = document.getElementById('gpv-date-label');
+            const summaryEl = document.getElementById('gpv-summary');
 
             cellsContainer.innerHTML = '';
             labelsContainer.innerHTML = '';
@@ -740,6 +793,8 @@
                 null;
             const currentSlot = getCurrentSlotIndex();
             let slotIdx = 0;
+            let offSlots = 0;
+            let maybeSlots = 0;
 
             for (let h = 0; h < 24; h++) {
                 for (const m of ['00', '30']) {
@@ -751,8 +806,10 @@
                     const info = classifySlotValue(val);
                     if (info.state === 'off') {
                         cell.classList.add('off');
+                        offSlots++;
                     } else if (info.state === 'maybe') {
                         cell.classList.add('maybe');
+                        maybeSlots++;
                     }
                     if (slotIdx === currentSlot) {
                         cell.classList.add('current');
@@ -762,6 +819,19 @@
                     cellsContainer.appendChild(cell);
                     slotIdx++;
                 }
+            }
+
+            if (offSlots === 0 && maybeSlots === 0) {
+                summaryEl.textContent = gpvEmptySchedule
+                    ? 'Відключень немає (API повернуло порожній графік)'
+                    : 'Відключень не заплановано';
+                summaryEl.style.color = '#86efac';
+            } else {
+                const parts = [];
+                if (offSlots > 0) parts.push(`відключень: ${(offSlots * 0.5).toFixed(1).replace('.0', '')} год`);
+                if (maybeSlots > 0) parts.push(`можливо: ${(maybeSlots * 0.5).toFixed(1).replace('.0', '')} год`);
+                summaryEl.textContent = parts.join(' · ');
+                summaryEl.style.color = '#fde047';
             }
         }
 
@@ -774,15 +844,26 @@
             for (const url of candidates) {
                 try {
                     const json = await fetchJsonWithFallback(url);
-                    const member = extractGpvMember(json);
-                    if (!member) {
-                        throw new Error('Empty or unexpected GPV JSON structure');
+                    const parsed = parseGpvResponse(json);
+                    if (parsed.status === 'invalid') {
+                        throw new Error('Unexpected GPV JSON structure');
                     }
 
-                    gpvRecord = member;
-                    localStorage.setItem('cached_gpv_record', JSON.stringify(member));
-                    statusEl.textContent = '● AUTO SYNC';
-                    statusEl.style.color = 'var(--accent-green)';
+                    gpvRecord = parsed.record;
+                    gpvEmptySchedule = parsed.status === 'empty';
+                    localStorage.setItem('cached_gpv_record', JSON.stringify({
+                        record: parsed.record,
+                        emptySchedule: gpvEmptySchedule,
+                        ts: Date.now()
+                    }));
+
+                    if (gpvEmptySchedule) {
+                        statusEl.textContent = '● NO OUTAGES';
+                        statusEl.style.color = 'var(--accent-green)';
+                    } else {
+                        statusEl.textContent = '● AUTO SYNC';
+                        statusEl.style.color = 'var(--accent-green)';
+                    }
                     lastSyncEl.textContent = `Останнє оновлення: ${nowStr}`;
                     renderGpvTimeline();
                     return;
@@ -792,8 +873,9 @@
             }
 
             const cached = JSON.parse(localStorage.getItem('cached_gpv_record') || 'null');
-            if (cached && cached.dataJson) {
-                gpvRecord = cached;
+            if (cached?.record) {
+                gpvRecord = cached.record;
+                gpvEmptySchedule = Boolean(cached.emptySchedule);
             }
             statusEl.textContent = '● CACHE / FALLBACK';
             statusEl.style.color = 'var(--accent-yellow)';
