@@ -422,14 +422,13 @@
     </div>
 
     <script>
+        const WORKER_BASE = 'https://ternopil-proxy.your-name.workers.dev';
+
         const CONFIG = {
             weatherUrl: 'https://api.open-meteo.com/v1/forecast?latitude=49.5535&longitude=25.5948&current=temperature_2m,weather_code&timezone=Europe%2FKyiv',
-            alertRawUrl: 'https://ubilling.net.ua/aerialalerts/?raw=true',
-            gpvApiUrl: 'https://toe.com.ua/api/actual_gpv_graphs/custom',
-            proxies: [
-                url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-                url => `https://corsproxy.io/?${encodeURIComponent(url)}`
-            ],
+            alertRawUrl: `${WORKER_BASE}/alert`,
+            gpvApiUrl: `${WORKER_BASE}/gpv`,
+            proxies: [],
             weatherIntervalMs: 15 * 60 * 1000,
             oneMinuteMs: 60 * 1000
         };
