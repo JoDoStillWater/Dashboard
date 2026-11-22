@@ -253,18 +253,53 @@
             white-space: nowrap;
         }
 
-        .fs-btn {
+        .floating-controls {
             position: fixed;
             bottom: 14px;
             right: 14px;
-            background: rgba(15, 23, 42, 0.85);
+            display: flex;
+            gap: 8px;
+            z-index: 999;
+        }
+
+        .action-btn {
+            background: rgba(15, 23, 42, 0.88);
             border: 1px solid var(--card-border);
             color: var(--text-main);
             padding: 8px 12px;
             border-radius: 8px;
             cursor: pointer;
-            z-index: 999;
             font-size: 0.8rem;
+            backdrop-filter: blur(8px);
+        }
+
+        #touch-lock-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(2, 6, 23, 0.18);
+            z-index: 1000;
+            display: none;
+            justify-content: flex-end;
+            align-items: flex-end;
+            padding: 14px;
+            touch-action: none;
+            user-select: none;
+        }
+
+        #touch-lock-overlay.active {
+            display: flex;
+        }
+
+        .unlock-btn {
+            background: rgba(15, 23, 42, 0.92);
+            border: 1px solid rgba(239, 68, 68, 0.55);
+            color: #fca5a5;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 0.82rem;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
         @media (max-width: 900px) {
@@ -285,7 +320,16 @@
     </style>
 </head>
 <body>
-    <button class="fs-btn" onclick="toggleFullScreen()">⛶ Повний екран</button>
+    <div class="floating-controls">
+        <button class="action-btn" id="lock-touch-btn" onclick="enableTouchLock()">🔒 Блокування дотиків</button>
+        <button class="action-btn" onclick="toggleFullScreen()">⛶ Повний екран</button>
+    </div>
+
+    <div id="touch-lock-overlay" aria-hidden="true">
+        <button class="unlock-btn" id="unlock-touch-btn" type="button">
+            🔓 Утримуйте 1.2 сек або 2× тап для розблокування
+        </button>
+    </div>
 
     <div id="app-container">
         <!-- Верхня панель: Годинник, Статус тривоги (Тернопільський р-н), Погода -->
@@ -456,7 +500,6 @@
                 }
             }
 
-            // Якщо у відповіді є масив регіонів/районів
             const list = Array.isArray(payload) ? payload : (Array.isArray(payload.districts) ? payload.districts : null);
             if (list) {
                 const districtMatch = list.find(item =>
@@ -538,7 +581,6 @@
 
             renderAlertBadge(isAlert, sourceNote);
 
-            // Оновлення iframe карти раз на хвилину
             const iframe = document.getElementById('alert-map-iframe');
             iframe.src = 'https://alerts.in.ua/';
         }
@@ -597,89 +639,4 @@
             const currentSlot = getCurrentSlotIndex();
             let slotIdx = 0;
 
-            for (let h = 0; h < 24; h++) {
-                for (const m of ['00', '30']) {
-                    const key = `${String(h).padStart(2, '0')}:${m}`;
-                    const cell = document.createElement('div');
-                    cell.className = 'slot-cell';
-
-                    const val = timesObj ? timesObj[key] : '0';
-                    const isOff = val === '1' || val === 1 || val === true;
-                    if (isOff) {
-                        cell.classList.add('off');
-                    }
-                    if (slotIdx === currentSlot) {
-                        cell.classList.add('current');
-                    }
-
-                    cell.title = `${key} — ${isOff ? 'Відключення' : 'Світло є'}`;
-                    cellsContainer.appendChild(cell);
-                    slotIdx++;
-                }
-            }
-        }
-
-        async function fetchGpvSchedule() {
-            const statusEl = document.getElementById('gpv-sync-status');
-            const lastSyncEl = document.getElementById('gpv-last-sync');
-            const nowStr = new Date().toLocaleTimeString('uk-UA', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-            });
-
-            try {
-                const json = await fetchViaProxies(CONFIG.gpvApiUrl);
-                const member = Array.isArray(json?.['hydra:member']) ? json['hydra:member'][0] : null;
-                if (!member || !member.dataJson) {
-                    throw new Error('Unexpected GPV JSON structure');
-                }
-
-                gpvRecord = member;
-                localStorage.setItem('cached_gpv_record', JSON.stringify(member));
-                statusEl.textContent = '● AUTO SYNC';
-                statusEl.style.color = 'var(--accent-green)';
-                lastSyncEl.textContent = `Останнє оновлення: ${nowStr}`;
-                renderGpvTimeline();
-            } catch (err) {
-                console.warn('GPV sync failed:', err);
-                const cached = JSON.parse(localStorage.getItem('cached_gpv_record') || 'null');
-                if (cached) {
-                    gpvRecord = cached;
-                }
-                statusEl.textContent = '● CACHE';
-                statusEl.style.color = 'var(--accent-yellow)';
-                lastSyncEl.textContent = `Останнє оновлення: ${nowStr} (кеш)`;
-                renderGpvTimeline();
-            }
-        }
-
-        function onQueueChange() {
-            selectedQueue = queueSelectEl.value;
-            localStorage.setItem('selectedQueue', selectedQueue);
-            renderGpvTimeline();
-        }
-
-        fetchGpvSchedule();
-        setInterval(fetchGpvSchedule, CONFIG.oneMinuteMs);
-
-        // 5. Легкий зсув для захисту екрана планшета від вигорання (щохвилини)
-        let step = 0;
-        setInterval(() => {
-            step = (step + 1) % 4;
-            const x = step % 2 === 0 ? 0 : 3;
-            const y = step < 2 ? 0 : 3;
-            document.getElementById('app-container').style.transform = `translate(${x}px, ${y}px)`;
-        }, CONFIG.oneMinuteMs);
-
-        function toggleFullScreen() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen?.().catch(() => {});
-            } else {
-                document.exitFullscreen?.().catch(() => {});
-            }
-        }
-    </script>
-</body>
-</html>
+            for (let h =
